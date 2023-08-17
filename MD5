@@ -1,0 +1,14 @@
+4d0b68319f302887ab0af5787771bde2 *DESCRIPTION
+d251a135aa50fba81ca5077952c562da *LICENSE
+9cda980b993ab80c3e431e9e06f780d1 *NAMESPACE
+b3c1bec50ef9e8b828ecf90ad0638169 *R/scriptloc.R
+92d437ab82ff8b0116b5c138c83cc29e *README.md
+41bd37719f889421bb4bf77a804f327c *build/vignette.rds
+9a8363266134909d16b9b44700611fda *inst/doc/scriptloc.R
+e38242e05546b05db89d44837f83dea8 *inst/doc/scriptloc.Rmd
+8fb558b583166ece142b677ee758f7a4 *inst/doc/scriptloc.html
+d16f9d6f334e34da2c048df21d565799 *man/script_dir_get.Rd
+620c1feaa6e6de77b6b93c821d7dfd51 *man/script_file_get.Rd
+5e30a2c8baf00fc89eb847d92717087a *man/scriptloc.Rd
+9f5122cda2c2dc0c3ffc7996ede6df32 *man/src_file_get.Rd
+e38242e05546b05db89d44837f83dea8 *vignettes/scriptloc.Rmd

@@ -1,0 +1,3 @@
+# scriptloc: Get the location of the R script that is being sourced/executed
+
+Provides functions to retrieve the location of R scripts loaded through the `source` function or run from the command line using the `Rscript` command. This functionality is analogous to the Bash shell's ${BASH_SOURCE[0]}. Users can first set the project root's path relative to the script path and then all subsequent paths relative to the root. This system ensures that all paths lead to the same location regardless of where any script is executed/loaded from without resorting to the use of `setwd` at the top of the scripts.

@@ -1,0 +1,243 @@
+---
+title: "scriptloc"
+author: "Naren C S"
+date: "`r Sys.Date()`"
+vignette: >
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteIndexEntry{Introdution to scriptloc and its usecase}
+output:
+    prettydoc::html_pretty:
+        theme: leonids
+        highlight: github
+---
+
+# The quickest user guide imaginable
+
+If you have an `R` file that you're either executing by `source`-ing it or by calling it from the command line using `Rscript`, and you want to get access to the path of that file inside the script, you can use the `scriptloc()` function:
+
+```{r eval=FALSE}
+script_path <- scriptloc()
+```
+
+Read on if you want to read why you might want to do this. Otherwise, you're all set, and that's all there is to using `scriptloc`. Just heed the next warning and you're good to go. 
+
+#### The only thing that can mess up `scriptloc`
+
+The way in which `scriptloc` works will be described in a different vignette, but the short version is that if you define any variable called `ofile` AFTER a script is sourced but BEFORE scriptloc() is called, then it won't work. I know this is an arbitrary restriction, but this is a current limitation of the package. So, **to be on the safe side, if you want scriptloc() to work reliably, don't define any variable called __ofile__**.
+
+# The Project Path Problem
+Handling file paths can be one of the most finicky parts of organizing a project. Consider a simple project structure that looks like so:
+```
+project
+│
+├── data.tsv   # (Raw data)
+└── script.R   # (Script that does the analysis)
+```
+
+In the project directory, we have a file called `data.tsv` that contains information to be processed. We want our analysis to be reproducible, so we do the sensible thing and have a `script.R` file cataloging the steps we take to produce an `output.tsv`.
+
+```{r script01, eval=FALSE, attr.source='.numberLines'}
+#' script.R
+#' Parse our dataset and write out results
+library(AwesomeRLib)
+f    <- 'data.tsv'
+x    <- read.table(f, sep = '\t', header = T, stringsAsFactors = F)
+y    <- some_cool_function(x)
+outf <- 'output.tsv'
+write.table(y, outf, sep = '\t', row.names = F, quote = F)
+```
+
+Here's a simple question: Where will the output be produced if we run `script.R`? This is a trick question because I've withheld crucial information --- namely, the current working directory from which the script is being run. Consider the full view of the directory tree:
+
+```
+home
+│
+└── user
+    │
+    └── project
+        │
+        ├── data.tsv   # (Raw data)
+        └── script.R   # (Script that does the analysis)
+
+```
+The absolute path of our project is `/home/user/project/`. If we start our R session from inside this folder, then it is implied that the `data.tsv` being read has the absolute path `/home/user/project/data.tsv`, and the output file being written will have the absolute path `/home/user/project/output.tsv`. But if our R session has a different working directory, it won't be able to find `data.tsv`, or worse, it could be opening a completely different file than what we intended. Because of this, it is common to see R scripts in the wild that look like this:
+
+```{r script02, eval=FALSE, attr.source='.numberLines'}
+#' script.R
+#' Parse our dataset and write out results
+setwd('/home/user/project')
+library(AwesomeRLib)
+f    <- 'data.tsv'
+x    <- read.table(f, sep = '\t', header = T, stringsAsFactors = F)
+y    <- some_cool_function(x)
+outf <- 'output.tsv'
+write.table(y, outf, sep = '\t', row.names = F, quote = F)
+```
+
+Notice that the first line now has a call to `setwd()`, so that the correct file is being read in and the correct file is being written out. This is one way to solve the problem. Another, more cumbersome way to do this would be as follows:
+
+```{r script03, eval=FALSE, attr.source='.numberLines'}
+#' script.R
+#' Parse our dataset and write out results
+library(AwesomeRLib)
+f    <- '/home/user/project/data.tsv'
+x    <- read.table(f, sep = '\t', header = T, stringsAsFactors = F)
+y    <- some_cool_function(x)
+outf <- '/home/user/project/output.tsv'
+write.table(y, outf, sep = '\t', row.names = F, quote = F)
+```
+
+In this solution, we are very explicit about the paths of the files so that no mistake can be made about what exactly is happening. Again, this script "gets the job done".
+
+Having said that, both of the previous solutions are inelegant:
+
++ If you change the project folder's location, you must remember to update the absolute path.
++ When sharing the project folder with others, they must to update the path before they run it.
+
+In the grand scheme of things, this seems like a minor problem --- but we've only been considering a simple project. Consider even a slightly larger project that looks like so:
+
+
+```
+project-root
+│
+├── data
+│   ├── dataset-01.tsv
+│   ├── dataset-02.tsv
+│   ├── dataset-03.tsv
+│   ├── dataset-04.tsv
+│   └── dataset-05.tsv
+├── plot
+│   ├── plot-01-dataset-description.png
+│   ├── plot-02-interesting-variables.png
+│   └── plot-03-cool-results.png
+│
+├── report.pdf
+│
+└── scripts
+    ├── 01-clean-data.R
+    ├── 02-process-data.R
+    ├── 03-plot-data.R
+    └── 04-generate-report.Rmd
+```
+
+The project is neatly organized so that the `data` and `code` are separated. At the very least, this implies that you need to update paths in 4 scripts. There are other ways to tackle this (such as using a project-specific `.Rprofile`), but that adds one more layer of complexity.
+
+# A solution from `BASH`
+
+In general, the only way to avoid this mess is to avoid using absolute paths. But as we've seen, relative paths are at the mercy of the working directory. There's a lovely solution to this problem in the `BASH` world, wherein we are given tools to dynamically access the path of the file being run from within the file itself. Consider a simple project again that looks like so:
+
+```
+project
+│
+├── data.tsv
+└── script.sh
+```
+
+```{bash eval=FALSE, attr.source='.numberLines'}
+#' script.sh
+
+script_path=${BASH_SOURCE[0]}
+script_dir=$(dirname "$script_path")
+data_path="${script_dir}/data.tsv"
+
+some_cool_software "$data_path"
+```
+
+`BASH_SOURCE[0]` contains the path to the script being executed, and `dirname` allows for getting the path to the directory where it is stored. The `script_dir` variable is now the project root, and all paths can be expressed with respect to it, as seen with the `data_path` example. So, now, all our paths are relative to the script's location, but we don't manually specify it---`BASH` is smart enough to understand what we want without mentioning it explicitly.
+
+
+Even in the case of a larger project with more subdirectories, this can still work:
+```
+project-root
+│
+├── data
+│   ├── dataset-01.tsv
+│   ├── dataset-02.tsv
+│   ├── dataset-03.tsv
+│   ├── dataset-04.tsv
+│   └── dataset-05.tsv
+├── plot
+│   ├── plot-01-dataset-description.png
+│   ├── plot-02-interesting-variables.png
+│   └── plot-03-cool-results.png
+│
+├── report.pdf
+│
+└── scripts
+    └── cool-bash-script.sh
+```
+
+
+```{bash eval=FALSE, attr.source='.numberLines'}
+#' cool-bash-script.sh
+script_path=${BASH_SOURCE[0]}
+script_dir=$(dirname "$script_path")
+projroot="${script_dir}/.."
+data_dir="${projroot}/data"
+```
+
+Here, we've conveniently defined a `projroot` path that can be used to define other paths based on it, making code easier to read once you get past the initial hump of looking at the boilerplate lines at the top of the script. This solution ensures that:
+
++ We don't need to muck about with absolute paths.
++ It doesn't matter where we invoke the script from. It'll figure out how to orient itself based on its position with respect to the current working directory where we call it from automatically.
++ We can move the entire project folder anywhere, and the scripts will automatically identify the correct inputs and output.
++ We can share the project folder with anyone; they won't have to muck about setting paths. The shared code is directly reproducible.
+
+There are a few downsides to this system:
+
+1. This boilerplate needs to be at the top of every script we write.
+2. If we change the script's location, we must update the other files' relative paths.
+
+Point [1] is unavoidable, and point [2] happens less often than the alternative of moving the project folder directly, making it less of a pain point in general. Nevertheless, I think both of these points are a small price to pay for complete reproducibility of path handling regardless of who runs the code and where it is run from. If you agree and want to implement a similar system in R, `scriptloc` can help you with it.
+
+# The `scriptloc` solution
+
+You can do something extremely analogous with `scriptloc`:
+
+```{r eval=FALSE}
+library(scriptloc)
+script_path <- scriptloc()
+script_dir  <- dirname(script_path)
+```
+
+This works regardless of whether you're executing your code using `Rscript` from the command line or `source()`-ing an R file from somewhere else. And that's it---that's all there is to using `scriptloc`! Now that you have access to `script_dir`, you can refer to other paths with respect to it (I recommend using the `file.path` function to build these paths---it works uniformly regardless of the OS on which the code is being run).
+
+# `scriptloc` works across any depth of execution
+Assume that you have two files `script-01.R` and `script-02.R` in a project folder, and that the latter script calls the former:
+
+```
+project
+│
+├── script-01.R
+└── script-02.R
+```
+
+```{r eval=FALSE}
+#' script-01.R
+writeLines("Output of scriptloc within first script:")
+writeLines(scriptloc())
+writeLines("---------")
+```
+
+```{r eval=FALSE}
+#' script-02.R
+library(scriptloc)
+source("script-01.R")
+writeLines("Output of scriptloc within second script:")
+writeLines(scriptloc())
+```
+
+If we run `script-02.R` from within the project directory, either using `Rscript` on the command line or by `sourcing` it interactively, the output will be:
+```
+Output of scriptloc within first script:
+script-01.R
+---------
+Output of scriptloc within second script:
+script-02.R
+```
+
+When `script-02.R` was run, it called `script-01.R` by `source`-ing it, and the `scriptloc()` function correctly identified that it was within `script-01.R` then. When the control came back to `script-02.R`, it again correctly understands that the execution was being done from `script-02.R`. In theory, you can have any depth of scripts calling other scripts and `scriptloc()` will give you the correct path at every step.
+
+
+
